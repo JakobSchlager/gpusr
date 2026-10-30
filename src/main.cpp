@@ -18,6 +18,8 @@ std::random_device r;
 // std::default_random_engine e1(r());
 std::default_random_engine e1(1);
 
+// Note that this has to be updated carefully. They are ordered by arity.
+// Furthermore note that op_code::LOG is currently also used to distinguish between arities (so add other unary operators before LOG).
 enum class op_code : int {
     SIN, 
     COS,
@@ -33,6 +35,9 @@ enum class op_code : int {
     LENGTH 
 };
 
+// Note that this has to be updated carefully.
+// The current implementation relies on arity = static_cast<int>(OP_n) + 1.
+// Also, x <= static_cast<int>(OP_2) is also used as a seperator between "operators" and constants
 enum class type : int {
     OP_1,           // unary operation
     OP_2,           // binary operation
