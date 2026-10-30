@@ -2,10 +2,12 @@
 #include "./exporter.h"
 #include <algorithm>
 #include <cassert>
+#include <functional>
 #include <iterator>
 #include <random>
 #include <cmath>
 #include <ranges>
+#include <type_traits>
 #include <vector>
 #include <filesystem>
 
@@ -450,6 +452,17 @@ void DEBUG_check(polish const & candidate, size_t const max_nodes) {
     assert(types.size() <= max_nodes);
 }
 
+template<typename F, typename... Args>
+requires std::is_invocable_r_v<void, F, Args...>
+auto measure_time(F&& f, Args&&... args) {
+    auto const start = std::chrono::steady_clock::now();
+
+    std::invoke(std::forward<F>(f), std::forward<Args>(args)...);
+
+    auto const end = std::chrono::steady_clock::now();
+    return std::chrono::duration<double, std::milli>(end - start);
+}
+
 void run_on(std::string_view filename) {
     exporter exporter{filename}; 
 
@@ -555,7 +568,8 @@ int main(void) {
     }; 
 
     for (auto const & file : files) {
-        run_on(file); 
+        auto const time = measure_time(run_on, file); 
+        print("File {0} took {1}ms", file, time.count()); 
     }
 
     return 0;
