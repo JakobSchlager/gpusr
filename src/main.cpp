@@ -257,8 +257,8 @@ std::pair<polish, polish> subtree_crossover(
     // continuously sample the distributions until we find a pair (i, j) which do not violate the max_nodes constraint.
     // may find a better solution for this, but it is guaranteed to have a solution (exchanging the roots).
     while (a_sizes[0] - a_sizes[i] + b_sizes[j] > max_nodes || b_sizes[0] - b_sizes[j] + a_sizes[i] > max_nodes) {
-        int i = crossover_point_a_dist(e1);
-        int j = crossover_point_b_dist(e1);
+        i = crossover_point_a_dist(e1);
+        j = crossover_point_b_dist(e1);
     }
 
     int const size_a = a_sizes[i];
