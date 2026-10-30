@@ -52,6 +52,9 @@ std::tuple<std::vector<int>, std::vector<double>> create(
     double const max_const,
     size_t const no_variables
 ) {
+    assert(max_nodes >= 1);
+    assert(no_variables >= 1);
+
     std::bernoulli_distribution            choose_operator(0.75);
     std::bernoulli_distribution            choose_variable(0.5);
     // chooses an index in the variable array
@@ -130,7 +133,8 @@ double apply(
         switch(types[index]) {
             case static_cast<int>(encoding::VARIABLE_INDEX): 
             {
-                stack[sp++] = variables[instances[index]];
+                auto variable_index = static_cast<std::size_t>(instances[index]);
+                stack[sp++] = variables[variable_index];
                 break;
             }
             case static_cast<int>(encoding::CONSTANT):
@@ -140,6 +144,8 @@ double apply(
             }
             case static_cast<int>(encoding::OP_2):
             {
+                assert(sp >= 2);
+
                 double v1 = stack[--sp];
                 double v2 = stack[--sp];
 
