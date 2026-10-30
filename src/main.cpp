@@ -156,12 +156,11 @@ double interpret(
     std::vector<int>    const & types, 
     std::vector<double> const & instances,
     std::vector<double> const & variables, 
-    int const   length
+    std::vector<double>       & stack
 ) {
-    std::vector<double> stack(length);
     size_t sp = 0;
 
-    for(int index = length - 1; index >= 0; --index) {
+    for(int index = std::size(types) - 1; index >= 0; --index) {
         switch(types[index]) {
             case static_cast<int>(type::VARIABLE_INDEX): 
             {
@@ -248,20 +247,30 @@ double interpret(
     return stack[0];
 }
 
-double interpret(polish const & candidate, auto const & datapoint) {
+double interpret(
+    polish const & candidate, 
+    auto   const & datapoint,     
+    std::vector<double> & stack
+) {
     auto const & [types, instances, sizes] = candidate;
-    return interpret(types, instances, datapoint, sizes[0]);
+    return interpret(types, instances, datapoint, stack);
 }
 
-std::vector<double> evaluate(std::vector<polish> const & population, auto const& dataset) {
+std::vector<double> evaluate(
+    std::vector<polish> const & population, 
+    auto                const & dataset, 
+    size_t              const   max_nodes
+) {
     std::vector<double> results{};
 
     std::size_t const y_index = std::size(dataset[0]) - 1;
+    // can reuse the stack (should be unique per thread)
+    std::vector<double> stack(max_nodes); 
     for(auto const & candidate : population) {
         // TODO: hopefully don't need a running average here (in case of overflow)
         double ssr = 0;
         for(auto const & datapoint : dataset) {
-            double const result = interpret(candidate, datapoint);
+            double const result = interpret(candidate, datapoint, stack);
             if (!std::isfinite(result)) {
               ssr = std::numeric_limits<double>::infinity();
               break;
@@ -478,7 +487,7 @@ void run_on(std::string_view filename) {
     }
 
     for (int i = 0; i < iterations; ++i) {
-        auto const errors = evaluate(population, ds);
+        auto const errors = evaluate(population, ds, max_nodes);
         next_population.clear();
 
         auto select = get_fitness_proportional_selection(errors);
