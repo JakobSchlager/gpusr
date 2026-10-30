@@ -4,6 +4,7 @@
 #include <stack>
 #include <cmath>
 #include <ranges>
+#include <vector>
 
 // Tree representation:
 // Expressions are stored as linearized trees in prefix (Polish) notation,
@@ -95,7 +96,26 @@ std::tuple<std::vector<int>, std::vector<double>> create(
     return { encoding, tree };
 }
 
+// returns a subtree size array for a given tree's types
+std::vector<int> get_sizes(const std::vector<int>& types) {
+    std::vector<int> sizes(types.size());
 
+    int index = 0;
+    auto visit = [&](this auto&& self) -> int {
+        int current = index++;
+        int type = types[current];
+
+        if (type > static_cast<int>(encoding::OP_2)) return sizes[current] = 1;
+
+        int left_size = self();
+        int right_size = self();
+
+        return sizes[current] = 1 + left_size + right_size;
+    };
+
+    visit();
+    return sizes;
+}
 
 int main(void) {
     // read_dataset(std::ifstream {"../data/test.txt"}); 
@@ -105,8 +125,10 @@ int main(void) {
     auto [types, instances] = create(
         8, 5, 10, 4); 
     
+    auto sizes = get_sizes(types); 
+
     auto print_tree = [&](this auto && self, int & index, int layer) -> void {
-        std::println("{:>{}}{}: {}", "", layer * 2, types[index], instances[index]);
+        std::println("{:>{}}{}: {}, {}", "", layer * 2, types[index], instances[index], sizes[index]);
         
         bool const is_operator = types[index] != 0; 
         ++index; 
