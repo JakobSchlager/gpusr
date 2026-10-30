@@ -1,4 +1,5 @@
 #include "./dataparser.h"
+#include "./exporter.h"
 #include <algorithm>
 #include <cassert>
 #include <iterator>
@@ -6,6 +7,7 @@
 #include <cmath>
 #include <ranges>
 #include <vector>
+#include <filesystem>
 
 // Tree representation:
 // Expressions are stored as linearized trees in prefix (Polish) notation,
@@ -439,20 +441,29 @@ void DEBUG_check(polish const & candidate, size_t const max_nodes) {
     assert(types.size() <= max_nodes);
 }
 
-int main(void) {
+void run_on(std::string_view filename) {
+    exporter exporter{filename}; 
+
     int   constexpr population_size = 100;
     int   constexpr iterations      = 1000;
     float constexpr p_mutation      = 0.25;
     int   constexpr max_nodes       = 10;
     int   constexpr min_const       = -100;
     int   constexpr max_const       = 100;
-    int   constexpr no_elites       = 0;
+    int   constexpr no_elites       = 1;
 
-    auto  const     ds              = read_dataset(std::ifstream {"../data/poly.txt"}); 
+    auto  const      ds              = read_dataset(std::ifstream {std::filesystem::path("../../data") / filename += ".txt"}); 
     int   const     no_variables    = std::size(ds[0]) - 1;
 
     // leaving it as vector for "weighted" sampling and random access
-    std::vector<op_code> active_operators { op_code::ADD, op_code::SUB, op_code::MUL, op_code::DIV }; 
+    std::vector<op_code> active_operators { 
+        op_code::SIN,
+        op_code::EXP,
+
+        op_code::ADD, 
+        op_code::MUL, 
+        op_code::DIV 
+    }; 
 
     std::bernoulli_distribution do_mutate(p_mutation);
 
@@ -509,11 +520,33 @@ int main(void) {
         }
         
         auto best = std::min_element(errors.begin(), errors.end());
-        std::println("Generation {}: Best MSE = {}", i, *best);
-        auto best_index = std::distance(errors.begin(), best);
-        print_tree(population[best_index]);
+        exporter.append_result(i, *best); 
+        if (i == iterations - 1) {
+            std::println("Generation {}: Best MSE = {}", i, *best);
+            auto best_index = std::distance(errors.begin(), best);
+            print_tree(population[best_index]);
+        }
 
         population.swap(next_population);
+    }
+
+    exporter.export_csv();
+}
+
+int main(void) {
+    std::string_view files[] {
+        "linear",
+        "poly", 
+        "product",
+        "rational",
+        "trig",
+        "exp",
+        "sinxyzq",
+        "poly4"
+    }; 
+
+    for (auto const & file : files) {
+        run_on(file); 
     }
 
     return 0;
