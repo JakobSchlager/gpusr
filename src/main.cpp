@@ -307,17 +307,10 @@ std::pair<polish, polish> subtree_crossover(
     };
 }
 
-int main(void) {
-    // read_dataset(std::ifstream {"../data/test.txt"}); 
-    // auto [encoding, tree] = create(
-    //     static_cast<size_t>(pow(2, 3)), 5, 10, 4); 
-    
-    auto [types, instances] = create(
-        8, 5, 10, 4); 
-    
-    auto sizes = get_sizes(types); 
+void print_tree(polish const & candidate) {
+    auto const & [types, instances, sizes] = candidate;
 
-    auto print_tree = [&](this auto && self, int & index, int layer) -> void {
+    auto print_tree_rec = [&](this auto && self, int & index, int layer) -> void {
         std::println("{:>{}}{}: {}, {}", "", layer * 2, types[index], instances[index], sizes[index]);
         
         bool const is_operator = types[index] != 0; 
@@ -329,7 +322,7 @@ int main(void) {
     }; 
 
     int index = 0; 
-    print_tree(index, 0); 
+    print_tree_rec(index, 0); 
 
     return 0; 
 }
