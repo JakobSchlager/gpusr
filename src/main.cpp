@@ -48,6 +48,10 @@ std::pair<int, encoding> opcode_arity(int const op) {
         : std::pair{2, encoding::OP_2}; 
 }
 
+std::pair<int, encoding> opcode_arity(op_codes const op) {
+    return opcode_arity(static_cast<int>(op));
+}
+
 using polish = std::tuple<
     std::vector<int>,    // types  
     std::vector<double>, // instances  
@@ -68,7 +72,8 @@ std::tuple<std::vector<int>, std::vector<double>> create(
     size_t const max_nodes,
     double const min_const,
     double const max_const,
-    size_t const no_variables
+    size_t const no_variables,
+    std::vector<op_codes> const & active_operators
 ) {
     assert(max_nodes >= 1);
     assert(no_variables >= 1);
@@ -77,7 +82,7 @@ std::tuple<std::vector<int>, std::vector<double>> create(
     std::bernoulli_distribution            choose_variable(0.5);
     // chooses an index in the variable array
     std::uniform_int_distribution<size_t>  variable_dist(0, no_variables - 1);
-    std::uniform_int_distribution<int>     operator_dist(0, static_cast<int>(op_codes::LENGTH) -1);
+    std::uniform_int_distribution<int>     operator_dist(0, std::size(active_operators) -1);
     std::uniform_real_distribution<double> constant_dist(min_const, max_const);
 
     std::vector<int>    types;
@@ -93,12 +98,12 @@ std::tuple<std::vector<int>, std::vector<double>> create(
         assert(remaining >= 0);
         assert(std::size(instances) + remaining <= max_nodes);
 
-        auto op = operator_dist(e1);
-        auto const [arity, encoding] = opcode_arity(op);
+        auto op = active_operators[operator_dist(e1)];
+        auto const [arity, type] = opcode_arity(op);
         bool can_insert_operator = std::size(instances) + remaining + arity <= max_nodes;
         if (can_insert_operator && choose_operator(e1)) {
-            instances.emplace_back(op);
-            types.push_back(static_cast<int>(encoding));
+            instances.emplace_back(static_cast<int>(op));
+            types.push_back(static_cast<int>(type));
             remaining = remaining - 1 + arity;
             continue;
         } 
@@ -301,14 +306,15 @@ void mutate(
     int const            max_nodes, 
     double const         min_const,
     double const         max_const,
-    int const            no_variables
+    int const            no_variables,
+    std::vector<op_codes> const & active_operators
 ) {
     // prefix "m_" for "mutation"
     int const m_index = std::uniform_int_distribution<>(0, sizes[0] - 1)(e1);
     int const original_size  = sizes[m_index];
     
     int const replacement_max_nodes = max_nodes - sizes[0] + original_size;
-    auto const [m_types, m_instances] = create(replacement_max_nodes, min_const, max_const, no_variables);
+    auto const [m_types, m_instances] = create(replacement_max_nodes, min_const, max_const, no_variables, active_operators);
 
     replace_subtree(types, 
         std::begin(m_types), std::end(m_types),m_index, original_size); 
@@ -322,10 +328,11 @@ void mutate(
     int const    max_nodes, 
     double const min_const,
     double const max_const,
-    int const    no_variables
+    int const    no_variables,
+    std::vector<op_codes> const & active_operators
 ) {
    auto & [types, instances, sizes] = candidate;
-   mutate(types, instances, sizes, max_nodes, min_const, max_const, no_variables);
+   mutate(types, instances, sizes, max_nodes, min_const, max_const, no_variables, active_operators);
 }
 
 // chooses one subtree from each parent and exchanges them
@@ -440,13 +447,16 @@ int main(void) {
     auto  const     ds              = read_dataset(std::ifstream {"../data/poly.txt"}); 
     int   const     no_variables    = std::size(ds[0]) - 1;
 
+    // leaving it as vector for "weighted" sampling and random access
+    std::vector<op_codes> active_operators { op_codes::ADD, op_codes::SUB, op_codes::MUL, op_codes::DIV }; 
+
     std::bernoulli_distribution do_mutate(p_mutation);
 
     std::vector<polish> population;      population.reserve(population_size);
     std::vector<polish> next_population; next_population.reserve(population_size);
 
     for (int i = 0; i < population_size; ++i) {
-        auto [types, instances] = create(max_nodes, min_const, max_const, no_variables); 
+        auto [types, instances] = create(max_nodes, min_const, max_const, no_variables, active_operators); 
         auto sizes = get_sizes(types); 
 
         population.emplace_back(std::move(types), std::move(instances), std::move(sizes));
@@ -483,13 +493,13 @@ int main(void) {
                 max_nodes
             );
 
-            if (do_mutate(e1)) mutate(child1, max_nodes, min_const, max_const, no_variables); 
+            if (do_mutate(e1)) mutate(child1, max_nodes, min_const, max_const, no_variables, active_operators); 
             DEBUG_check(child1, max_nodes); 
             next_population.push_back(std::move(child1));
 
             if (next_population.size() >= population_size) continue;
 
-            if (do_mutate(e1)) mutate(child2, max_nodes, min_const, max_const, no_variables);
+            if (do_mutate(e1)) mutate(child2, max_nodes, min_const, max_const, no_variables, active_operators);
             DEBUG_check(child2, max_nodes); 
             next_population.push_back(std::move(child2));
         }
