@@ -190,6 +190,117 @@ auto get_fitness_proportional_selection(std::vector<double> const& errors) {
     return selection;
 }
 
+void replace_subtree(
+    auto& dst,
+    const auto& src_begin,
+    const auto& src_end,
+    std::size_t const index,
+    std::size_t const count
+) {
+    dst.erase(dst.begin() + index, dst.begin() + index + count);
+    dst.insert(dst.begin() + index, src_begin, src_end);
+};
+
+void mutate(
+    std::vector<int>&    types, 
+    std::vector<double>& instances, 
+    std::vector<int>&    sizes, 
+    int const            max_nodes, 
+    double const         min_const,
+    double const         max_const,
+    int const            no_variables
+) {
+    // prefix "m_" for "mutation"
+    int const m_index = std::uniform_int_distribution<>(0, sizes[0] - 1)(e1);
+    int const original_size  = sizes[m_index];
+    
+    // must not exceed max_nodes to prevent issues with padding etc.
+    int const replacement_max_nodes = max_nodes - sizes[0] + original_size;
+    auto const [m_types, m_instances] = create(replacement_max_nodes, 0, 100, no_variables);
+
+    replace_subtree(types, 
+        std::begin(m_types), std::end(m_types),m_index, original_size); 
+    replace_subtree(instances, 
+        std::begin(m_instances), std::end(m_instances), m_index, original_size);
+    sizes = get_sizes(types);
+}
+
+using polish = std::tuple<
+    std::vector<int>,    // types  
+    std::vector<double>, // instances  
+    std::vector<int>     // sizes
+>;
+
+// chooses one subtree from each parent and exchanges them
+// returns two new candidates (c1, c2), where 
+//  c1 = a[0:i] b[j:j+size(b, j)] a[i + size(a, i):]
+//  c2 = b[0:j] a[i:i+size(a, i)] b[j + size(b, j):]
+// for two crossover points i, j.
+std::pair<polish, polish> subtree_crossover(
+    polish const& a,
+    polish const& b,
+    size_t const  max_nodes
+) {
+    auto [a_types, a_instances, a_sizes] = a;
+    auto [b_types, b_instances, b_sizes] = b;
+
+    auto crossover_point_a_dist = std::uniform_int_distribution<>(0, a_sizes[0] - 1);
+    auto crossover_point_b_dist = std::uniform_int_distribution<>(0, b_sizes[0] - 1);
+    int i = crossover_point_a_dist(e1);
+    int j = crossover_point_b_dist(e1);
+    // continuously sample the distributions until we find a pair (i, j) which do not violate the max_nodes constraint.
+    // may find a better solution for this, but it is guaranteed to have a solution (exchanging the roots).
+    while (a_sizes[0] - a_sizes[i] + b_sizes[j] > max_nodes || b_sizes[0] - b_sizes[j] + a_sizes[i] > max_nodes) {
+        int i = crossover_point_a_dist(e1);
+        int j = crossover_point_b_dist(e1);
+    }
+
+    int const size_a = a_sizes[i];
+    int const size_b = b_sizes[j];
+
+    // replace subtree of A with subtree of B
+    replace_subtree(
+        a_types,
+        b_types.begin() + j,
+        b_types.begin() + j + size_b,
+        i,
+        size_a
+    );
+    replace_subtree(
+        a_instances,
+        b_instances.begin() + j,
+        b_instances.begin() + j + size_b,
+        i,
+        size_a
+    );
+
+    // replace subtree of B with subtree of A
+    // since we copied a and b already, we can use the original a as our temporary
+    auto const & [tmp_types, tmp_instances, _] = a;
+    replace_subtree(
+        b_types,
+        tmp_types.begin() + i,
+        tmp_types.begin() + i + size_a,
+        j,
+        size_b
+    );
+    replace_subtree(
+        b_instances,
+        tmp_instances.begin() + i,
+        tmp_instances.begin() + i + size_a,
+        j,
+        size_b
+    );
+
+    a_sizes = get_sizes(a_types);
+    b_sizes = get_sizes(b_types);
+
+    return {
+        {std::move(a_types), std::move(a_instances), std::move(a_sizes)},
+        {std::move(b_types), std::move(b_instances), std::move(b_sizes)}
+    };
+}
+
 int main(void) {
     // read_dataset(std::ifstream {"../data/test.txt"}); 
     // auto [encoding, tree] = create(
