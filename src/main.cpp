@@ -18,7 +18,7 @@ std::random_device r;
 // std::default_random_engine e1(r());
 std::default_random_engine e1(1);
 
-enum class op_codes : int {
+enum class op_code : int {
     SIN, 
     COS,
     SQRT,
@@ -41,14 +41,14 @@ enum class encoding : int {
 };
 
 std::pair<int, encoding> opcode_arity(int const op) {
-    assert(op < static_cast<int>(op_codes::LENGTH));
+    assert(op < static_cast<int>(op_code::LENGTH));
 
-    return op <= static_cast<int>(op_codes::LOG)
+    return op <= static_cast<int>(op_code::LOG)
         ? std::pair{1, encoding::OP_1}
         : std::pair{2, encoding::OP_2}; 
 }
 
-std::pair<int, encoding> opcode_arity(op_codes const op) {
+std::pair<int, encoding> opcode_arity(op_code const op) {
     return opcode_arity(static_cast<int>(op));
 }
 
@@ -73,7 +73,7 @@ std::tuple<std::vector<int>, std::vector<double>> create(
     double const min_const,
     double const max_const,
     size_t const no_variables,
-    std::vector<op_codes> const & active_operators
+    std::vector<op_code> const & active_operators
 ) {
     assert(max_nodes >= 1);
     assert(no_variables >= 1);
@@ -175,28 +175,28 @@ double interpret(
                 double const v = stack[--sp];
 
                 switch(static_cast<int>(instances[index])) {
-                    case static_cast<int>(op_codes::SIN): 
+                    case static_cast<int>(op_code::SIN): 
                     {
                         stack[sp++] = std::sin(v);
                         break;
                     }
                     break;
-                    case static_cast<int>(op_codes::COS): 
+                    case static_cast<int>(op_code::COS): 
                     {
                         stack[sp++] = std::cos(v); 
                         break;
                     }
-                    case static_cast<int>(op_codes::SQRT):
+                    case static_cast<int>(op_code::SQRT):
                     {
                         stack[sp++] = std::sqrt(v); 
                         break;
                     }
-                    case static_cast<int>(op_codes::EXP): 
+                    case static_cast<int>(op_code::EXP): 
                     {
                         stack[sp++] = std::exp(v); 
                         break;
                     }
-                    case static_cast<int>(op_codes::LOG): 
+                    case static_cast<int>(op_code::LOG): 
                     {
                         stack[sp++] = std::log(v); 
                         break;
@@ -215,16 +215,16 @@ double interpret(
                 double const v2 = stack[--sp];
 
                 switch (static_cast<int>(instances[index])) {
-                    case static_cast<int>(op_codes::ADD):                 
+                    case static_cast<int>(op_code::ADD):                 
                         stack[sp++] = v1 + v2;
                         break;
-                    case static_cast<int>(op_codes::SUB):                 
+                    case static_cast<int>(op_code::SUB):                 
                         stack[sp++] = v1 - v2;
                         break;
-                    case static_cast<int>(op_codes::MUL):                 
+                    case static_cast<int>(op_code::MUL):                 
                         stack[sp++] = v1 * v2;
                         break;
-                    case static_cast<int>(op_codes::DIV):                 
+                    case static_cast<int>(op_code::DIV):                 
                         stack[sp++] = v1 / v2;
                         break;
                     default: 
@@ -307,7 +307,7 @@ void mutate(
     double const         min_const,
     double const         max_const,
     int const            no_variables,
-    std::vector<op_codes> const & active_operators
+    std::vector<op_code> const & active_operators
 ) {
     // prefix "m_" for "mutation"
     int const m_index = std::uniform_int_distribution<>(0, sizes[0] - 1)(e1);
@@ -329,7 +329,7 @@ void mutate(
     double const min_const,
     double const max_const,
     int const    no_variables,
-    std::vector<op_codes> const & active_operators
+    std::vector<op_code> const & active_operators
 ) {
    auto & [types, instances, sizes] = candidate;
    mutate(types, instances, sizes, max_nodes, min_const, max_const, no_variables, active_operators);
@@ -442,13 +442,13 @@ int main(void) {
     int   constexpr max_nodes       = 10;
     int   constexpr min_const       = -100;
     int   constexpr max_const       = 100;
-    int   constexpr no_elites       = 5;
+    int   constexpr no_elites       = 0;
 
     auto  const     ds              = read_dataset(std::ifstream {"../data/poly.txt"}); 
     int   const     no_variables    = std::size(ds[0]) - 1;
 
     // leaving it as vector for "weighted" sampling and random access
-    std::vector<op_codes> active_operators { op_codes::ADD, op_codes::SUB, op_codes::MUL, op_codes::DIV }; 
+    std::vector<op_code> active_operators { op_code::ADD, op_code::SUB, op_code::MUL, op_code::DIV }; 
 
     std::bernoulli_distribution do_mutate(p_mutation);
 
