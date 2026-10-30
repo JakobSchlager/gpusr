@@ -222,7 +222,7 @@ void mutate(
     
     // must not exceed max_nodes to prevent issues with padding etc.
     int const replacement_max_nodes = max_nodes - sizes[0] + original_size;
-    auto const [m_types, m_instances] = create(replacement_max_nodes, 0, 100, no_variables);
+    auto const [m_types, m_instances] = create(replacement_max_nodes, min_const, max_const, no_variables);
 
     replace_subtree(types, 
         std::begin(m_types), std::end(m_types),m_index, original_size); 
