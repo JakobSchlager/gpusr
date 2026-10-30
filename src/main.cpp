@@ -19,6 +19,12 @@ std::random_device r;
 std::default_random_engine e1(1);
 
 enum class op_codes : int {
+    SIN, 
+    COS,
+    SQRT,
+    EXP,
+    LOG,
+
     ADD,
     SUB,
     MUL,
@@ -28,10 +34,19 @@ enum class op_codes : int {
 };
 
 enum class encoding : int {
+    OP_1,           // unary operation
     OP_2,           // binary operation
     VARIABLE_INDEX,  
     CONSTANT 
 };
+
+std::pair<int, encoding> opcode_arity(int const op) {
+    assert(op < static_cast<int>(op_codes::LENGTH));
+
+    return op <= static_cast<int>(op_codes::LOG)
+        ? std::pair{1, encoding::OP_1}
+        : std::pair{2, encoding::OP_2}; 
+}
 
 using polish = std::tuple<
     std::vector<int>,    // types  
@@ -78,13 +93,13 @@ std::tuple<std::vector<int>, std::vector<double>> create(
         assert(remaining >= 0);
         assert(std::size(instances) + remaining <= max_nodes);
 
-        bool can_insert_operator = std::size(instances) + remaining + 2 <= max_nodes;
-
+        auto op = operator_dist(e1);
+        auto const [arity, encoding] = opcode_arity(op);
+        bool can_insert_operator = std::size(instances) + remaining + arity <= max_nodes;
         if (can_insert_operator && choose_operator(e1)) {
-            instances.emplace_back(operator_dist(e1));
-            // TODO(arity): remaining = remaining - 1 + arity(operator)
-            types.push_back(static_cast<int>(encoding::OP_2));
-            ++remaining;
+            instances.emplace_back(op);
+            types.push_back(static_cast<int>(encoding));
+            remaining = remaining - 1 + arity;
             continue;
         } 
         if (choose_variable(e1)) {
@@ -113,13 +128,16 @@ std::vector<int> get_sizes(const std::vector<int>& types) {
 
         if (type > static_cast<int>(encoding::OP_2)) return sizes[current] = 1;
 
+        if (type == static_cast<int>(encoding::OP_1)) return sizes[current] = 1 + self();
+
+        assert(type == static_cast<int>(encoding::OP_2));
         int left_size = self();
         int right_size = self();
-
         return sizes[current] = 1 + left_size + right_size;
     };
 
     visit();
+    assert(index == static_cast<int>(types.size()));
     return sizes;
 }
 
@@ -145,12 +163,51 @@ double interpret(
                 stack[sp++] = instances[index];
                 break;
             }
+            case static_cast<int>(encoding::OP_1):
+            {
+                assert(sp >= 1);
+
+                double const v = stack[--sp];
+
+                switch(static_cast<int>(instances[index])) {
+                    case static_cast<int>(op_codes::SIN): 
+                    {
+                        stack[sp++] = std::sin(v);
+                        break;
+                    }
+                    break;
+                    case static_cast<int>(op_codes::COS): 
+                    {
+                        stack[sp++] = std::cos(v); 
+                        break;
+                    }
+                    case static_cast<int>(op_codes::SQRT):
+                    {
+                        stack[sp++] = std::sqrt(v); 
+                        break;
+                    }
+                    case static_cast<int>(op_codes::EXP): 
+                    {
+                        stack[sp++] = std::exp(v); 
+                        break;
+                    }
+                    case static_cast<int>(op_codes::LOG): 
+                    {
+                        stack[sp++] = std::log(v); 
+                        break;
+                    }
+                    default: 
+                        assert(false && "unknown unary operator");
+
+                }
+                break;
+            }
             case static_cast<int>(encoding::OP_2):
             {
                 assert(sp >= 2);
 
-                double v1 = stack[--sp];
-                double v2 = stack[--sp];
+                double const v1 = stack[--sp];
+                double const v2 = stack[--sp];
 
                 switch (static_cast<int>(instances[index])) {
                     case static_cast<int>(op_codes::ADD):                 
@@ -166,7 +223,7 @@ double interpret(
                         stack[sp++] = v1 / v2;
                         break;
                     default: 
-                        assert(false && "unknown operator");
+                        assert(false && "unknown binary operator");
                 }
 
                 break;
@@ -345,18 +402,21 @@ void print_tree(polish const & candidate) {
     auto const & [types, instances, sizes] = candidate;
 
     auto print_tree_rec = [&](this auto && self, int & index, int layer) -> void {
+        assert(index >= 0 && index < static_cast<int>(std::size(types)));
+
         std::println("{:>{}}{}: {}, {}", "", layer * 2, types[index], instances[index], sizes[index]);
         
-        bool const is_operator = types[index] != 0; 
-        ++index; 
-        if (is_operator) return;
-
-        self(index, layer + 1);
-        self(index, layer + 1);
+        bool const is_op_code = types[index] <= static_cast<int>(encoding::OP_2); 
+        int const  arity = is_op_code ? opcode_arity(instances[index]).first : 0;
+        ++index;
+        
+        for (int i = 0; i < arity; ++i) self(index, layer + 1);
     }; 
 
     int index = 0; 
     print_tree_rec(index, 0); 
+
+    assert(index == static_cast<int>(std::size(types)));
 }
 
 void DEBUG_check(polish const & candidate, size_t const max_nodes) {
