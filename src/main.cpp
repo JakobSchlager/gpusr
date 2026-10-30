@@ -117,6 +117,79 @@ std::vector<int> get_sizes(const std::vector<int>& types) {
     return sizes;
 }
 
+double apply(
+    std::vector<int>    const & types, 
+    std::vector<double> const & instances,
+    std::vector<double> const & variables, 
+    int const   length
+) {
+    std::vector<double> stack(length);
+    size_t sp = 0;
+
+    for(int index = length - 1; index >= 0; --index) {
+        switch(types[index]) {
+            case static_cast<int>(encoding::VARIABLE_INDEX): 
+            {
+                stack[sp++] = variables[instances[index]];
+                break;
+            }
+            case static_cast<int>(encoding::CONSTANT):
+            {
+                stack[sp++] = instances[index];
+                break;
+            }
+            case static_cast<int>(encoding::OP_2):
+            {
+                double v1 = stack[--sp];
+                double v2 = stack[--sp];
+
+                switch (static_cast<int>(instances[index])) {
+                    case static_cast<int>(op_codes::ADD):                 
+                        stack[sp++] = v1 + v2;
+                        break;
+                    case static_cast<int>(op_codes::SUB):                 
+                        stack[sp++] = v1 - v2;
+                        break;
+                    case static_cast<int>(op_codes::MUL):                 
+                        stack[sp++] = v1 * v2;
+                        break;
+                    case static_cast<int>(op_codes::DIV):                 
+                        stack[sp++] = v1 / v2;
+                        break;
+                    default: 
+                        assert(false && "unknown operator");
+                }
+
+                break;
+            }
+            default: 
+                assert(false && "uknown node type");
+        }
+    }
+
+    assert(sp == 1 && "valid expression must leave exactly one value on the evaluation stack"); 
+    return stack[0];
+}
+
+
+// fitness proportional selection (roulette-wheel)
+// TODO(interface)
+auto get_fitness_proportional_selection(std::vector<double> const& errors) {
+    std::vector<double> fitness;
+    fitness.reserve(errors.size());
+
+    for (double error : errors) {
+        fitness.push_back(std::isfinite(error) && error >= 0.0 
+            ? 1.0 / (1.0 + error) 
+            : 0.0); 
+    }
+
+    std::discrete_distribution<std::size_t> selection(fitness.begin(),
+                                                        fitness.end());
+
+    return selection;
+}
+
 int main(void) {
     // read_dataset(std::ifstream {"../data/test.txt"}); 
     // auto [encoding, tree] = create(
