@@ -133,12 +133,11 @@ std::vector<int> get_sizes(const std::vector<int>& types) {
 
         if (type > static_cast<int>(type::OP_2)) return sizes[current] = 1;
 
-        if (type == static_cast<int>(type::OP_1)) return sizes[current] = 1 + self();
-
-        assert(type == static_cast<int>(type::OP_2));
-        int left_size = self();
-        int right_size = self();
-        return sizes[current] = 1 + left_size + right_size;
+        int const arity = static_cast<int>(type) + 1; 
+        int size = 1;
+        for (int i = 0; i < arity; ++i) size += self();
+        
+        return sizes[current] = size;
     };
 
     visit();
