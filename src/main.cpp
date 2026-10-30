@@ -13,10 +13,6 @@
 // This representation supports stack-based evaluation by traversing
 // the encoded nodes in reverse order.
 // See: https://arxiv.org/abs/2501.17168
-//
-// Each individual uses a fixed storage capacity of max_nodes, allowing
-// constant-stride addressing within a population (offset = idx * max_nodes).
-// The actual number of nodes may differ between individuals.
 
 std::random_device r;
 // std::default_random_engine e1(r());
@@ -254,7 +250,6 @@ void mutate(
     int const m_index = std::uniform_int_distribution<>(0, sizes[0] - 1)(e1);
     int const original_size  = sizes[m_index];
     
-    // must not exceed max_nodes to prevent issues with padding etc.
     int const replacement_max_nodes = max_nodes - sizes[0] + original_size;
     auto const [m_types, m_instances] = create(replacement_max_nodes, min_const, max_const, no_variables);
 
