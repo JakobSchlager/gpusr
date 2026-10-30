@@ -158,7 +158,7 @@ double interpret(
     std::vector<int>    const & types, 
     std::vector<double> const & instances,
     std::vector<double> const & variables, 
-    auto                      & stack
+    std::vector<double>       & stack
 ) {
     size_t sp = 0;
 
@@ -252,22 +252,22 @@ double interpret(
 double interpret(
     polish const & candidate, 
     auto   const & datapoint,     
-    auto         & stack
+    std::vector<double> & stack
 ) {
     auto const & [types, instances, sizes] = candidate;
     return interpret(types, instances, datapoint, stack);
 }
 
-template<std::size_t max_nodes>
 std::vector<double> evaluate(
     std::vector<polish> const & population, 
-    auto                const & dataset
+    auto                const & dataset, 
+    size_t              const   max_nodes
 ) {
     std::vector<double> results{};
 
     std::size_t const y_index = std::size(dataset[0]) - 1;
     // can reuse the stack (should be unique per thread)
-    std::array<double, max_nodes> stack; 
+    std::vector<double> stack(max_nodes); 
     for(auto const & candidate : population) {
         // TODO: hopefully don't need a running average here (in case of overflow)
         double ssr = 0;
@@ -500,7 +500,7 @@ void run_on(std::string_view filename) {
     }
 
     for (int i = 0; i < iterations; ++i) {
-        auto const errors = evaluate<max_nodes>(population, ds);
+        auto const errors = evaluate(population, ds, max_nodes);
         next_population.clear();
 
         auto select = get_fitness_proportional_selection(errors);
