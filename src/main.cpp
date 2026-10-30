@@ -1,7 +1,8 @@
 #include "./dataparser.h"
+#include <algorithm>
 #include <cassert>
+#include <iterator>
 #include <random>
-#include <stack>
 #include <cmath>
 #include <ranges>
 #include <vector>
@@ -35,6 +36,12 @@ enum class encoding : int {
     VARIABLE_INDEX,  
     CONSTANT 
 };
+
+using polish = std::tuple<
+    std::vector<int>,    // types  
+    std::vector<double>, // instances  
+    std::vector<int>     // sizes
+>;
 
 // returns a tuple (types, instances)
 // where (types_i, instances_i) means instance_i is of type_i
@@ -120,7 +127,7 @@ std::vector<int> get_sizes(const std::vector<int>& types) {
     return sizes;
 }
 
-double apply(
+double interpret(
     std::vector<int>    const & types, 
     std::vector<double> const & instances,
     std::vector<double> const & variables, 
@@ -177,6 +184,33 @@ double apply(
     return stack[0];
 }
 
+double interpret(polish const & candidate, auto const & datapoint) {
+    auto const & [types, instances, sizes] = candidate;
+    return interpret(types, instances, datapoint, sizes[0]);
+}
+
+std::vector<double> evaluate(std::vector<polish> const & population, auto const& dataset) {
+    std::vector<double> results{};
+
+    std::size_t const y_index = std::size(dataset[0]) - 1;
+    for(auto const & candidate : population) {
+        // TODO: hopefully don't need a running average here (in case of overflow)
+        double ssr = 0;
+        for(auto const & datapoint : dataset) {
+            double const result = interpret(candidate, datapoint);
+            if (!std::isfinite(result)) {
+              ssr = std::numeric_limits<double>::infinity();
+              break;
+            }
+            double const error  = result - datapoint[y_index];
+            ssr += error * error;
+        }
+        double const mse = ssr / std::size(dataset);
+        results.push_back(mse);
+    }
+
+    return results;
+}
 
 // fitness proportional selection (roulette-wheel)
 // TODO(interface)
@@ -231,11 +265,16 @@ void mutate(
     sizes = get_sizes(types);
 }
 
-using polish = std::tuple<
-    std::vector<int>,    // types  
-    std::vector<double>, // instances  
-    std::vector<int>     // sizes
->;
+void mutate(
+    polish&      candidate,
+    int const    max_nodes, 
+    double const min_const,
+    double const max_const,
+    int const    no_variables
+) {
+   auto & [types, instances, sizes] = candidate;
+   mutate(types, instances, sizes, max_nodes, min_const, max_const, no_variables);
+}
 
 // chooses one subtree from each parent and exchanges them
 // returns two new candidates (c1, c2), where 
@@ -323,6 +362,90 @@ void print_tree(polish const & candidate) {
 
     int index = 0; 
     print_tree_rec(index, 0); 
+}
 
-    return 0; 
+void DEBUG_check(polish const & candidate, size_t const max_nodes) {
+    auto const & [types, instances, sizes] = candidate;
+
+    assert(types.size() == instances.size());
+    assert(types.size() == sizes.size());
+    assert(sizes[0] == static_cast<int>(types.size()));
+    assert(types.size() <= max_nodes);
+}
+
+int main(void) {
+    int   constexpr population_size = 100;
+    int   constexpr iterations      = 1000;
+    float constexpr p_mutation      = 0.25;
+    int   constexpr max_nodes       = 10;
+    int   constexpr min_const       = -100;
+    int   constexpr max_const       = 100;
+    int   constexpr no_elites       = 5;
+
+    auto  const     ds              = read_dataset(std::ifstream {"../data/poly.txt"}); 
+    int   const     no_variables    = std::size(ds[0]) - 1;
+
+    std::bernoulli_distribution do_mutate(p_mutation);
+
+    std::vector<polish> population;      population.reserve(population_size);
+    std::vector<polish> next_population; next_population.reserve(population_size);
+
+    for (int i = 0; i < population_size; ++i) {
+        auto [types, instances] = create(max_nodes, min_const, max_const, no_variables); 
+        auto sizes = get_sizes(types); 
+
+        population.emplace_back(std::move(types), std::move(instances), std::move(sizes));
+    }
+
+    for (int i = 0; i < iterations; ++i) {
+        auto const errors = evaluate(population, ds);
+        next_population.clear();
+
+        auto select = get_fitness_proportional_selection(errors);
+
+        // elitism
+        std::vector<std::size_t> indices(errors.size());
+        std::iota(indices.begin(), indices.end(), 0);
+        std::vector<std::size_t> elite_indices(no_elites);
+        std::partial_sort_copy(
+            indices.begin(), indices.end(),
+            elite_indices.begin(), elite_indices.end(),
+            [&](auto a, auto b) {
+                return errors[a] < errors[b];
+            }
+        );
+        for (auto index : elite_indices) {
+            next_population.push_back(population[index]);
+        }
+
+        while (next_population.size() < population_size) {
+            auto const parent1 = select(e1);
+            auto const parent2 = select(e1);
+
+            auto [child1, child2] = subtree_crossover(
+                population[parent1],
+                population[parent2],
+                max_nodes
+            );
+
+            if (do_mutate(e1)) mutate(child1, max_nodes, min_const, max_const, no_variables); 
+            DEBUG_check(child1, max_nodes); 
+            next_population.push_back(std::move(child1));
+
+            if (next_population.size() >= population_size) continue;
+
+            if (do_mutate(e1)) mutate(child2, max_nodes, min_const, max_const, no_variables);
+            DEBUG_check(child2, max_nodes); 
+            next_population.push_back(std::move(child2));
+        }
+        
+        auto best = std::min_element(errors.begin(), errors.end());
+        std::println("Generation {}: Best MSE = {}", i, *best);
+        auto best_index = std::distance(errors.begin(), best);
+        print_tree(population[best_index]);
+
+        population.swap(next_population);
+    }
+
+    return 0;
 }
