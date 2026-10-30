@@ -59,10 +59,10 @@ std::tuple<std::vector<int>, std::vector<double>> create(
     std::uniform_int_distribution<int>     operator_dist(0, static_cast<int>(op_codes::LENGTH) -1);
     std::uniform_real_distribution<double> constant_dist(min_const, max_const);
 
-    std::vector<int>    encoding(max_nodes, -1); 
-    auto encoding_itr { std::begin(encoding) }; 
-    std::vector<double> tree;
-    tree.reserve(max_nodes);
+    std::vector<int>    types;
+    std::vector<double> instances;
+    types.reserve(max_nodes);
+    instances.reserve(max_nodes);
 
     // for a simple first implementation, we can avoid a stack if we do not care about tree depth. 
     // we can simply keep track of how many more elements we need to "fill" the tree
@@ -70,30 +70,30 @@ std::tuple<std::vector<int>, std::vector<double>> create(
 
     while (remaining > 0) {
         assert(remaining >= 0);
-        assert(tree.size() + remaining <= max_nodes);
+        assert(std::size(instances) + remaining <= max_nodes);
 
-        bool can_insert_operator = tree.size() + remaining + 2 <= max_nodes;
+        bool can_insert_operator = std::size(instances) + remaining + 2 <= max_nodes;
 
         if (can_insert_operator && choose_operator(e1)) {
-            tree.emplace_back(operator_dist(e1));
+            instances.emplace_back(operator_dist(e1));
             // TODO(arity): remaining = remaining - 1 + arity(operator)
-            *encoding_itr++ = static_cast<int>(encoding::OP_2);
+            types.push_back(static_cast<int>(encoding::OP_2));
             ++remaining;
             continue;
         } 
         if (choose_variable(e1)) {
-            tree.emplace_back(variable_dist(e1)); 
-            *encoding_itr++ = static_cast<int>(encoding::VARIABLE_INDEX);
+            instances.emplace_back(variable_dist(e1)); 
+            types.push_back(static_cast<int>(encoding::VARIABLE_INDEX)); 
             --remaining;
             continue;
         }
 
-        tree.emplace_back(constant_dist(e1)); 
-        *encoding_itr++ = static_cast<int>(encoding::CONSTANT);
+        instances.emplace_back(constant_dist(e1)); 
+        types.push_back(static_cast<int>(encoding::CONSTANT));
         --remaining;
     }
 
-    return { encoding, tree };
+    return { types, instances };
 }
 
 // returns a subtree size array for a given tree's types
