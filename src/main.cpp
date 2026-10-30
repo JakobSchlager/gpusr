@@ -33,22 +33,22 @@ enum class op_code : int {
     LENGTH 
 };
 
-enum class encoding : int {
+enum class type : int {
     OP_1,           // unary operation
     OP_2,           // binary operation
     VARIABLE_INDEX,  
     CONSTANT 
 };
 
-std::pair<int, encoding> opcode_arity(int const op) {
+std::pair<int, type> opcode_arity(int const op) {
     assert(op < static_cast<int>(op_code::LENGTH));
 
     return op <= static_cast<int>(op_code::LOG)
-        ? std::pair{1, encoding::OP_1}
-        : std::pair{2, encoding::OP_2}; 
+        ? std::pair{1, type::OP_1}
+        : std::pair{2, type::OP_2}; 
 }
 
-std::pair<int, encoding> opcode_arity(op_code const op) {
+std::pair<int, type> opcode_arity(op_code const op) {
     return opcode_arity(static_cast<int>(op));
 }
 
@@ -109,13 +109,13 @@ std::tuple<std::vector<int>, std::vector<double>> create(
         } 
         if (choose_variable(e1)) {
             instances.emplace_back(variable_dist(e1)); 
-            types.push_back(static_cast<int>(encoding::VARIABLE_INDEX)); 
+            types.push_back(static_cast<int>(type::VARIABLE_INDEX)); 
             --remaining;
             continue;
         }
 
         instances.emplace_back(constant_dist(e1)); 
-        types.push_back(static_cast<int>(encoding::CONSTANT));
+        types.push_back(static_cast<int>(type::CONSTANT));
         --remaining;
     }
 
@@ -131,11 +131,11 @@ std::vector<int> get_sizes(const std::vector<int>& types) {
         int current = index++;
         int type = types[current];
 
-        if (type > static_cast<int>(encoding::OP_2)) return sizes[current] = 1;
+        if (type > static_cast<int>(type::OP_2)) return sizes[current] = 1;
 
-        if (type == static_cast<int>(encoding::OP_1)) return sizes[current] = 1 + self();
+        if (type == static_cast<int>(type::OP_1)) return sizes[current] = 1 + self();
 
-        assert(type == static_cast<int>(encoding::OP_2));
+        assert(type == static_cast<int>(type::OP_2));
         int left_size = self();
         int right_size = self();
         return sizes[current] = 1 + left_size + right_size;
@@ -157,18 +157,18 @@ double interpret(
 
     for(int index = length - 1; index >= 0; --index) {
         switch(types[index]) {
-            case static_cast<int>(encoding::VARIABLE_INDEX): 
+            case static_cast<int>(type::VARIABLE_INDEX): 
             {
                 auto variable_index = static_cast<std::size_t>(instances[index]);
                 stack[sp++] = variables[variable_index];
                 break;
             }
-            case static_cast<int>(encoding::CONSTANT):
+            case static_cast<int>(type::CONSTANT):
             {
                 stack[sp++] = instances[index];
                 break;
             }
-            case static_cast<int>(encoding::OP_1):
+            case static_cast<int>(type::OP_1):
             {
                 assert(sp >= 1);
 
@@ -207,7 +207,7 @@ double interpret(
                 }
                 break;
             }
-            case static_cast<int>(encoding::OP_2):
+            case static_cast<int>(type::OP_2):
             {
                 assert(sp >= 2);
 
@@ -413,7 +413,7 @@ void print_tree(polish const & candidate) {
 
         std::println("{:>{}}{}: {}, {}", "", layer * 2, types[index], instances[index], sizes[index]);
         
-        bool const is_op_code = types[index] <= static_cast<int>(encoding::OP_2); 
+        bool const is_op_code = types[index] <= static_cast<int>(type::OP_2); 
         int const  arity = is_op_code ? opcode_arity(instances[index]).first : 0;
         ++index;
         
