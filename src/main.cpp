@@ -35,6 +35,16 @@ enum class encoding : int {
     CONSTANT 
 };
 
+// returns a tuple (types, instances)
+// where (types_i, instances_i) means instance_i is of type_i
+// f.e.: [OP_2, OP_2, VARIABLE_INDEX, CONSTANT, CONSTANT]
+//       [ADD,  MUL,  1,              25.5,     13.3]
+// 
+//                         ADD
+//                        /   \
+//                      MUL   13.3
+//                     /   \   
+//                VAR[1]   25.5 
 std::tuple<std::vector<int>, std::vector<double>> create(
     size_t const max_nodes,
     double const min_const,
