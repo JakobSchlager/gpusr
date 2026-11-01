@@ -1,5 +1,4 @@
-#ifndef OPERATORS_H
-#define OPERATORS_H
+#pragma once
 
 #include <utility>
 #include <cassert>
@@ -31,7 +30,7 @@ enum class type : int {
     CONSTANT 
 };
 
-std::pair<int, type> opcode_arity(int const op) {
+inline std::pair<int, type> opcode_arity(int const op) {
     assert(op < static_cast<int>(op_code::LENGTH));
 
     return op <= static_cast<int>(op_code::LOG)
@@ -39,8 +38,7 @@ std::pair<int, type> opcode_arity(int const op) {
         : std::pair{2, type::OP_2}; 
 }
 
-std::pair<int, type> opcode_arity(op_code const op) {
+inline std::pair<int, type> opcode_arity(op_code const op) {
     return opcode_arity(static_cast<int>(op));
 }
 
-#endif

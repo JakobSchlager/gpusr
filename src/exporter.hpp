@@ -1,5 +1,4 @@
-#ifndef EXPORTER_H
-#define EXPORTER_H
+#pragma once
 
 #include <algorithm>
 #include <cassert>
@@ -37,4 +36,3 @@ private:
     std::vector<std::pair<int, double>> generation_results{};
 };
 
-#endif

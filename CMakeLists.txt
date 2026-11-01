@@ -1,15 +1,25 @@
 cmake_minimum_required(VERSION 3.25)
 project(gpusr LANGUAGES CXX)
 
-file(GLOB_RECURSE sources src/*.cpp)
-file(GLOB_RECURSE headers src/*.hpp)
+# TODO: clean this up
+# file(GLOB_RECURSE sources src/*.cpp)
+# file(GLOB_RECURSE headers src/*.hpp)
 
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 option(GPUSR_ENABLE_CUDA "Enable CUDA evaluator" ON)
 
-add_executable(gpusr ${headers} ${sources})
+# add_executable(gpusr ${headers} ${sources})
+add_executable(gpusr 
+    src/dataparser.hpp
+    src/evaluator.h
+    src/evolution.hpp
+    src/exporter.hpp
+    src/operators.hpp
+    src/parameters.h
+    src/main.cpp
+)
 
 if(GPUSR_ENABLE_CUDA)
     enable_language(CUDA)
@@ -17,7 +27,7 @@ if(GPUSR_ENABLE_CUDA)
     find_package(CUDAToolkit REQUIRED)
 
     target_sources(gpusr PRIVATE
-        src/evaluator_cuda.h
+        src/evaluator_cuda.cu
     )
 
     set_target_properties(gpusr PROPERTIES
@@ -33,4 +43,7 @@ if(GPUSR_ENABLE_CUDA)
     target_compile_definitions(gpusr PRIVATE
         GPUSR_ENABLE_CUDA=1
     )
+else()
+    target_sources(gpusr PRIVATE 
+	src/evaluator.cpp)
 endif()

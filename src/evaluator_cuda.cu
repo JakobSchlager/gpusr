@@ -1,10 +1,10 @@
-#ifndef EVALUTOR_CUDA_CU
-#define EVALUTOR_CUDA_CU
-
 #include <vector>
-#include <cub/cub.h>
+#include <cub/block/block_reduce.cuh>
 
 #include "./operators.hpp"
+#include "./parameters.h"
+
+#include "./evaluator.h"
 
 #define CUDA_CHECK(call) do {                         \
     cudaError_t err = (call);                         \
@@ -25,10 +25,10 @@ using polish = std::tuple<
 
 template <int MAX_NODES>
 __device__ double interpret_gpu(
-    int*    const types, 
-    double* const instances,
-    double* const variables, 
-    int     const length
+    int    const * types, 
+    double const * instances,
+    double const * variables, 
+    int    const   length
 ) {
     double stack[MAX_NODES]; 
     size_t sp = 0;
@@ -121,21 +121,20 @@ __device__ double interpret_gpu(
 
 template<int MAX_NODES, int BLOCK_SIZE>
 __global__ void evaluate_kernel(
-    const int* types,
-    const double* instances,
-    const int* lengths,
-    const double* dataset,
-    double* mse,
-    int max_nodes,
-    int dataset_size,
-    int row_length
+    int    const * types,
+    double const * instances,
+    int    const * lengths,
+    double const * dataset,
+    double       * mse,
+    int    const dataset_size,
+    int    const row_length
 ) {
     int const individual = blockIdx.x;
-    int tid = threadIdx.x;
+    int const tid        = threadIdx.x;
 
-    const int* tree_types = types + individual * max_nodes;
-    const double* tree_instances = instances + individual * max_nodes;
-    int length = lengths[individual];
+    int    const * tree_types     = types + individual * max_nodes;
+    double const * tree_instances = instances + individual * max_nodes;
+    int    const   length         = lengths[individual];
 
     double sse = 0.0;
 
@@ -157,35 +156,34 @@ __global__ void evaluate_kernel(
 
     __shared__ typename BlockReduce::TempStorage temp_storage;
 
-    double total = BlockReduce(temp_storage).Sum(sum);
+    double total = BlockReduce(temp_storage).Sum(sse);
 
     if (tid == 0) {
         mse[individual] = total / dataset_size;
     }
 }
 
-template<int MAX_NODES>
 std::vector<double> evaluate(
     std::vector<polish> const & population, 
-    auto                const & dataset
+    dataset_t           const & dataset
 ) {
     int    *d_population_types, *d_lengths;
     double *d_population_instances, *d_mse, *d_dataset;
 
     size_t const population_size = std::size(population);
-    cudaMalloc(&d_population_types,     MAX_NODES * population_size * sizeof(int));
-    cudaMalloc(&d_population_instances, MAX_NODES * population_size * sizeof(double));
-    cudaMalloc(&d_lengths,     population_size * sizeof(int));
+    CUDA_CHECK(cudaMalloc(&d_population_types,     max_nodes * population_size * sizeof(int)));
+    CUDA_CHECK(cudaMalloc(&d_population_instances, max_nodes * population_size * sizeof(double)));
+    CUDA_CHECK(cudaMalloc(&d_lengths,              population_size * sizeof(int)));
 
-    cudaMalloc(&d_mse,                  population_size * sizeof(double)); 
+    CUDA_CHECK(cudaMalloc(&d_mse,                  population_size * sizeof(double)));
 
     std::size_t const row_length = std::size(dataset[0]); // n_variables + y
-    cudaMalloc(&d_dataset, std::size(dataset) * row_length * sizeof(double));
+    CUDA_CHECK(cudaMalloc(&d_dataset, std::size(dataset) * row_length * sizeof(double)));
 
     for(int i = 0; auto const & [types, instances, sizes] : population) {
-    	cudaMemcpy(d_population_types     + i * MAX_NODES, types.data,     std::size(types) * sizeof(int),        cudaMemcpyHostToDevice);
-    	cudaMemcpy(d_population_instances + i * MAX_NODES, instances.data, std::size(instances) * sizeof(double), cudaMemcpyHostToDevice);
-    	cudaMemcpy(d_lengths + i, sizes.data[0], sizeof(int), cudaMemcpyHostToDevice);
+    	CUDA_CHECK(cudaMemcpy(d_population_types     + i * max_nodes, types.data(),     std::size(types) * sizeof(int),        cudaMemcpyHostToDevice));
+    	CUDA_CHECK(cudaMemcpy(d_population_instances + i * max_nodes, instances.data(), std::size(instances) * sizeof(double), cudaMemcpyHostToDevice));
+    	CUDA_CHECK(cudaMemcpy(d_lengths + i, sizes.data(), sizeof(int), cudaMemcpyHostToDevice));
     	++i;
     }
 
@@ -197,13 +195,13 @@ std::vector<double> evaluate(
     // should allow to reuse the stacks a bit, while also making reduction easier
     constexpr int BLOCK_SIZE = 256;
 
-    evaluate_kernel<MAX_NODES, BLOCK_SIZE><<<population_size, BLOCK_SIZE>>>(
+    evaluate_kernel<max_nodes, BLOCK_SIZE><<<population_size, BLOCK_SIZE>>>(
 	d_population_types,
 	d_population_instances,
 	d_lengths,
 	d_dataset,
 	d_mse,
-	dataset.size(),
+	std::size(dataset),
 	row_length
     );
 
@@ -227,4 +225,3 @@ std::vector<double> evaluate(
     return results;
 }
 
-#endif

@@ -1,6 +1,3 @@
-#ifndef EVALUATOR_H
-#define EVALUATOR_H
-
 #include <vector>
 
 #include <cassert>
@@ -9,6 +6,9 @@
 #include <vector>
 
 #include "./operators.hpp"
+#include "./parameters.h"
+
+#include "./evaluator.h"
 
 using polish = std::tuple<
     std::vector<int>,    // types  
@@ -119,16 +119,15 @@ double interpret(
     return interpret(types, instances, datapoint, stack);
 }
 
-template<std::size_t MAX_NODES>
 std::vector<double> evaluate(
     std::vector<polish> const & population, 
-    auto                const & dataset
+    dataset_t           const & dataset
 ) {
     std::vector<double> results{};
 
     std::size_t const y_index = std::size(dataset[0]) - 1;
     // can reuse the stack (should be unique per thread)
-    std::array<double, MAX_NODES> stack; 
+    std::array<double, max_nodes> stack; 
     for(auto const & candidate : population) {
         // TODO: hopefully don't need a running average here (in case of overflow)
         double ssr = 0;
@@ -148,4 +147,3 @@ std::vector<double> evaluate(
     return results;
 }
 
-#endif
