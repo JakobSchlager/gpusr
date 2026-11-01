@@ -304,8 +304,8 @@ void run_on(std::string_view filename) {
     int   constexpr max_const       = 100;
     int   constexpr no_elites       = 1;
 
-    auto  const      ds              = read_dataset(std::ifstream {std::filesystem::path("../../data") / filename += ".txt"}); 
-    int   const     no_variables    = std::size(ds[0]) - 1;
+    auto  const     dataset         = read_dataset(std::ifstream {std::filesystem::path("../../data") / filename += ".txt"}); 
+    int   const     no_variables    = std::size(dataset[0]) - 1;
 
     // leaving it as vector for "weighted" sampling and random access
     std::vector<op_code> active_operators { 
@@ -330,7 +330,7 @@ void run_on(std::string_view filename) {
     }
 
     for (int i = 0; i < iterations; ++i) {
-        auto const errors = evaluate(population, ds, max_nodes);
+        auto const errors = evaluate<max_nodes>(population, dataset);
         next_population.clear();
 
         auto select = get_fitness_proportional_selection(errors);

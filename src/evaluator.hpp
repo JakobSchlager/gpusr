@@ -20,7 +20,7 @@ double interpret(
     std::vector<int>    const & types, 
     std::vector<double> const & instances,
     std::vector<double> const & variables, 
-    std::vector<double>       & stack
+    auto		      & stack
 ) {
     size_t sp = 0;
 
@@ -113,22 +113,22 @@ double interpret(
 double interpret(
     polish const & candidate, 
     auto   const & datapoint,     
-    std::vector<double> & stack
+    auto         & stack
 ) {
     auto const & [types, instances, sizes] = candidate;
     return interpret(types, instances, datapoint, stack);
 }
 
+template<std::size_t MAX_NODES>
 std::vector<double> evaluate(
     std::vector<polish> const & population, 
-    auto                const & dataset, 
-    size_t              const   max_nodes
+    auto                const & dataset
 ) {
     std::vector<double> results{};
 
     std::size_t const y_index = std::size(dataset[0]) - 1;
     // can reuse the stack (should be unique per thread)
-    std::vector<double> stack(max_nodes); 
+    std::array<double, MAX_NODES> stack; 
     for(auto const & candidate : population) {
         // TODO: hopefully don't need a running average here (in case of overflow)
         double ssr = 0;
