@@ -7,5 +7,30 @@ file(GLOB_RECURSE headers src/*.hpp)
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(sample ${headers} ${sources})
+option(GPUSR_ENABLE_CUDA "Enable CUDA evaluator" ON)
 
+add_executable(gpusr ${headers} ${sources})
+
+if(GPUSR_ENABLE_CUDA)
+    enable_language(CUDA)
+
+    find_package(CUDAToolkit REQUIRED)
+
+    target_sources(gpusr PRIVATE
+        src/evaluator_cuda.h
+    )
+
+    set_target_properties(gpusr PROPERTIES
+        CUDA_STANDARD 20
+        CUDA_STANDARD_REQUIRED ON
+        CUDA_ARCHITECTURES 75
+    )
+
+    target_link_libraries(gpusr PRIVATE
+        CUDA::cudart
+    )
+
+    target_compile_definitions(gpusr PRIVATE
+        GPUSR_ENABLE_CUDA=1
+    )
+endif()
