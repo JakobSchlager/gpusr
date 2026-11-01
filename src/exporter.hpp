@@ -1,3 +1,6 @@
+#ifndef EXPORTER_H
+#define EXPORTER_H
+
 #include <algorithm>
 #include <cassert>
 #include <filesystem>
@@ -33,3 +36,5 @@ struct exporter {
 private:
     std::vector<std::pair<int, double>> generation_results{};
 };
+
+#endif

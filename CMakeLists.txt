@@ -1,14 +1,11 @@
-cmake_minimum_required(VERSION 3.10)
-project(gpusr)  
+cmake_minimum_required(VERSION 3.25)
+project(gpusr LANGUAGES CXX)
 
 file(GLOB_RECURSE sources src/*.cpp)
-file(GLOB_RECURSE headers src/*.h)
+file(GLOB_RECURSE headers src/*.hpp)
 
 set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(sample ${headers} ${sources})
 
-if (MINGW AND CMAKE_CXX_COMPILER_ID STREQUAL GNU)
-    # std:: print, println, ...
-    target_link_libraries(sample stdc++exp) 
-endif()

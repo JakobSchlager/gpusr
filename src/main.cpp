@@ -1,5 +1,3 @@
-#include "./dataparser.h"
-#include "./exporter.h"
 #include <algorithm>
 #include <cassert>
 #include <functional>
@@ -9,7 +7,11 @@
 #include <ranges>
 #include <type_traits>
 #include <vector>
-#include <filesystem>
+
+#include "./operators.hpp"
+#include "./evaluator.hpp"
+#include "./dataparser.hpp"
+#include "./exporter.hpp"
 
 // Tree representation:
 // Expressions are stored as linearized trees in prefix (Polish) notation,
@@ -21,45 +23,6 @@
 std::random_device r;
 // std::default_random_engine e1(r());
 std::default_random_engine e1(1);
-
-// Note that this has to be updated carefully. They are ordered by arity.
-// Furthermore note that op_code::LOG is currently also used to distinguish between arities (so add other unary operators before LOG).
-enum class op_code : int {
-    SIN, 
-    COS,
-    SQRT,
-    EXP,
-    LOG,
-
-    ADD,
-    SUB,
-    MUL,
-    DIV,
-    
-    LENGTH 
-};
-
-// Note that this has to be updated carefully.
-// The current implementation relies on arity = static_cast<int>(OP_n) + 1.
-// Also, x <= static_cast<int>(OP_2) is also used as a seperator between "operators" and constants
-enum class type : int {
-    OP_1,           // unary operation
-    OP_2,           // binary operation
-    VARIABLE_INDEX,  
-    CONSTANT 
-};
-
-std::pair<int, type> opcode_arity(int const op) {
-    assert(op < static_cast<int>(op_code::LENGTH));
-
-    return op <= static_cast<int>(op_code::LOG)
-        ? std::pair{1, type::OP_1}
-        : std::pair{2, type::OP_2}; 
-}
-
-std::pair<int, type> opcode_arity(op_code const op) {
-    return opcode_arity(static_cast<int>(op));
-}
 
 using polish = std::tuple<
     std::vector<int>,    // types  
@@ -75,7 +38,7 @@ using polish = std::tuple<
 //                         ADD
 //                        /   \
 //                      MUL   13.3
-//                     /   \   
+//                     /   \
 //                VAR[1]   25.5 
 std::tuple<std::vector<int>, std::vector<double>> create(
     size_t const max_nodes,
@@ -152,139 +115,6 @@ std::vector<int> get_sizes(const std::vector<int>& types) {
     visit();
     assert(index == static_cast<int>(types.size()));
     return sizes;
-}
-
-double interpret(
-    std::vector<int>    const & types, 
-    std::vector<double> const & instances,
-    std::vector<double> const & variables, 
-    std::vector<double>       & stack
-) {
-    size_t sp = 0;
-
-    for(int index = std::size(types) - 1; index >= 0; --index) {
-        switch(types[index]) {
-            case static_cast<int>(type::VARIABLE_INDEX): 
-            {
-                auto variable_index = static_cast<std::size_t>(instances[index]);
-                stack[sp++] = variables[variable_index];
-                break;
-            }
-            case static_cast<int>(type::CONSTANT):
-            {
-                stack[sp++] = instances[index];
-                break;
-            }
-            case static_cast<int>(type::OP_1):
-            {
-                assert(sp >= 1);
-
-                double const v = stack[--sp];
-
-                switch(static_cast<int>(instances[index])) {
-                    case static_cast<int>(op_code::SIN): 
-                    {
-                        stack[sp++] = std::sin(v);
-                        break;
-                    }
-                    break;
-                    case static_cast<int>(op_code::COS): 
-                    {
-                        stack[sp++] = std::cos(v); 
-                        break;
-                    }
-                    case static_cast<int>(op_code::SQRT):
-                    {
-                        stack[sp++] = std::sqrt(v); 
-                        break;
-                    }
-                    case static_cast<int>(op_code::EXP): 
-                    {
-                        stack[sp++] = std::exp(v); 
-                        break;
-                    }
-                    case static_cast<int>(op_code::LOG): 
-                    {
-                        stack[sp++] = std::log(v); 
-                        break;
-                    }
-                    default: 
-                        assert(false && "unknown unary operator");
-
-                }
-                break;
-            }
-            case static_cast<int>(type::OP_2):
-            {
-                assert(sp >= 2);
-
-                double const v1 = stack[--sp];
-                double const v2 = stack[--sp];
-
-                switch (static_cast<int>(instances[index])) {
-                    case static_cast<int>(op_code::ADD):                 
-                        stack[sp++] = v1 + v2;
-                        break;
-                    case static_cast<int>(op_code::SUB):                 
-                        stack[sp++] = v1 - v2;
-                        break;
-                    case static_cast<int>(op_code::MUL):                 
-                        stack[sp++] = v1 * v2;
-                        break;
-                    case static_cast<int>(op_code::DIV):                 
-                        stack[sp++] = v1 / v2;
-                        break;
-                    default: 
-                        assert(false && "unknown binary operator");
-                }
-
-                break;
-            }
-            default: 
-                assert(false && "uknown node type");
-        }
-    }
-
-    assert(sp == 1 && "valid expression must leave exactly one value on the evaluation stack"); 
-    return stack[0];
-}
-
-double interpret(
-    polish const & candidate, 
-    auto   const & datapoint,     
-    std::vector<double> & stack
-) {
-    auto const & [types, instances, sizes] = candidate;
-    return interpret(types, instances, datapoint, stack);
-}
-
-std::vector<double> evaluate(
-    std::vector<polish> const & population, 
-    auto                const & dataset, 
-    size_t              const   max_nodes
-) {
-    std::vector<double> results{};
-
-    std::size_t const y_index = std::size(dataset[0]) - 1;
-    // can reuse the stack (should be unique per thread)
-    std::vector<double> stack(max_nodes); 
-    for(auto const & candidate : population) {
-        // TODO: hopefully don't need a running average here (in case of overflow)
-        double ssr = 0;
-        for(auto const & datapoint : dataset) {
-            double const result = interpret(candidate, datapoint, stack);
-            if (!std::isfinite(result)) {
-              ssr = std::numeric_limits<double>::infinity();
-              break;
-            }
-            double const error  = result - datapoint[y_index];
-            ssr += error * error;
-        }
-        double const mse = ssr / std::size(dataset);
-        results.push_back(mse);
-    }
-
-    return results;
 }
 
 // fitness proportional selection (roulette-wheel)

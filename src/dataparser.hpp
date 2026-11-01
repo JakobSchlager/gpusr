@@ -1,3 +1,6 @@
+#ifndef DATAPARSER_H
+#define DATAPARSER_H
+
 #include <fstream>
 #include <print>
 #include <sstream>
@@ -23,3 +26,5 @@ auto read_dataset(std::istream&& in) {
 
     return result;
 }
+
+#endif
