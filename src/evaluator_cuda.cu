@@ -164,63 +164,65 @@ __global__ void evaluate_kernel(
     }
 }
 
-std::vector<double> evaluate(
-    std::vector<polish> const & population, 
-    dataset             const & data
-) {
-    int    *d_population_types, *d_lengths;
-    double *d_population_instances, *d_mse, *d_dataset;
 
-    size_t const population_size = std::size(population);
-    CUDA_CHECK(cudaMalloc(&d_population_types,     max_nodes * population_size * sizeof(int)));
-    CUDA_CHECK(cudaMalloc(&d_population_instances, max_nodes * population_size * sizeof(double)));
-    CUDA_CHECK(cudaMalloc(&d_lengths,              population_size * sizeof(int)));
+// TODO(Architecture): population size, parameters, ...
+gpu_evaluator::gpu_evaluator(dataset const & data) 
+      : data_rows{data.rows}, data_cols{data.cols}
+    {
+      // dataset
+      std::size_t const dataset_bytes = data.rows * data.cols * sizeof(double);
+      CUDA_CHECK(cudaMalloc(&d_dataset, dataset_bytes));
+      cudaMemcpy(d_dataset, data.data.data(), dataset_bytes, cudaMemcpyHostToDevice);
 
-    CUDA_CHECK(cudaMalloc(&d_mse,                  population_size * sizeof(double)));
+      // population and result
+      // size_t const population_size = population_size;
+      CUDA_CHECK(cudaMalloc(&d_population_types,     max_nodes * population_size * sizeof(int)));
+      CUDA_CHECK(cudaMalloc(&d_population_instances, max_nodes * population_size * sizeof(double)));
+      CUDA_CHECK(cudaMalloc(&d_lengths,              population_size * sizeof(int)));
 
-    for(int i = 0; auto const & [types, instances, sizes] : population) {
-    	CUDA_CHECK(cudaMemcpy(d_population_types     + i * max_nodes, types.data(),     std::size(types) * sizeof(int),        cudaMemcpyHostToDevice));
-    	CUDA_CHECK(cudaMemcpy(d_population_instances + i * max_nodes, instances.data(), std::size(instances) * sizeof(double), cudaMemcpyHostToDevice));
-    	CUDA_CHECK(cudaMemcpy(d_lengths + i, sizes.data(), sizeof(int), cudaMemcpyHostToDevice));
-    	++i;
+      CUDA_CHECK(cudaMalloc(&d_mse,                  population_size * sizeof(double)));
     }
 
-    std::size_t const row_length = data.cols; // n_variables + y
-    std::size_t const dataset_bytes = data.rows * row_length * sizeof(double);
-    CUDA_CHECK(cudaMalloc(&d_dataset, dataset_bytes));
-    cudaMemcpy(d_dataset, data.data.data(), dataset_bytes, cudaMemcpyHostToDevice);
+std::vector<double> gpu_evaluator::evaluate(std::vector<polish> const & population) {
+   for(int i = 0; auto const & [types, instances, sizes] : population) {
+   	CUDA_CHECK(cudaMemcpy(d_population_types     + i * max_nodes, types.data(),     std::size(types) * sizeof(int),        cudaMemcpyHostToDevice));
+   	CUDA_CHECK(cudaMemcpy(d_population_instances + i * max_nodes, instances.data(), std::size(instances) * sizeof(double), cudaMemcpyHostToDevice));
+   	CUDA_CHECK(cudaMemcpy(d_lengths + i, sizes.data(), sizeof(int), cudaMemcpyHostToDevice));
+   	++i;
+   }
 
-    // launch one block per candidate, each thread then evaluates |dataset| / BLOCK_SIZE data points
-    // should allow to reuse the stacks a bit, while also making reduction easier
-    constexpr int BLOCK_SIZE = 256;
+   // launch one block per candidate, each thread then evaluates |dataset| / BLOCK_SIZE data points
+   // should allow to reuse the stacks a bit, while also making reduction easier
+   constexpr int BLOCK_SIZE = 256;
+   evaluate_kernel<max_nodes, BLOCK_SIZE><<<population_size, BLOCK_SIZE>>>(
+     d_population_types,
+     d_population_instances,
+     d_lengths,
+     d_dataset,
+     d_mse,
+     data_rows,
+     data_cols
+   );
 
-    evaluate_kernel<max_nodes, BLOCK_SIZE><<<population_size, BLOCK_SIZE>>>(
-	d_population_types,
-	d_population_instances,
-	d_lengths,
-	d_dataset,
-	d_mse,
-	data.rows,
-	row_length
-    );
+   CUDA_CHECK(cudaGetLastError());
+   CUDA_CHECK(cudaDeviceSynchronize());
 
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
+   std::vector<double> results(population_size);
+   CUDA_CHECK(cudaMemcpy(
+       results.data(),
+       d_mse,
+       population_size * sizeof(double),
+       cudaMemcpyDeviceToHost
+   ));
 
-    std::vector<double> results(population_size);
-    CUDA_CHECK(cudaMemcpy(
-        results.data(),
-        d_mse,
-        population_size * sizeof(double),
-        cudaMemcpyDeviceToHost
-    ));
-
-    CUDA_CHECK(cudaFree(d_population_types));
-    CUDA_CHECK(cudaFree(d_population_instances));
-    CUDA_CHECK(cudaFree(d_lengths));
-    CUDA_CHECK(cudaFree(d_mse));
-    CUDA_CHECK(cudaFree(d_dataset));
-
-    return results;
+   return results;
+}
+    
+gpu_evaluator::~gpu_evaluator() {
+   CUDA_CHECK(cudaFree(d_population_types));
+   CUDA_CHECK(cudaFree(d_population_instances));
+   CUDA_CHECK(cudaFree(d_lengths));
+   CUDA_CHECK(cudaFree(d_mse));
+   CUDA_CHECK(cudaFree(d_dataset));
 }
 

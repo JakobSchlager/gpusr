@@ -63,6 +63,7 @@ void run_on(std::string_view filename) {
     auto  const     data         = read_dataset(std::ifstream {std::filesystem::path("../../data") / filename += ".txt"}); 
     int   const     no_variables = data.cols - 1;
 
+    gpu_evaluator evaluator(data);
     // leaving it as vector for "weighted" sampling and random access
     std::vector<op_code> active_operators { 
         op_code::SIN,
@@ -86,7 +87,7 @@ void run_on(std::string_view filename) {
     }
 
     for (int i = 0; i < iterations; ++i) {
-        auto const errors = evaluate(population, data);
+        auto const errors = evaluator.evaluate(population);
         next_population.clear();
 
         auto select = get_fitness_proportional_selection(errors);
