@@ -4,9 +4,11 @@
 #include <iterator>
 #include <cmath>
 #include <vector>
+#include <span>
 
 #include "./operators.hpp"
 #include "./parameters.h"
+#include "./dataset.h"
 
 #include "./evaluator.h"
 
@@ -17,10 +19,10 @@ using polish = std::tuple<
 >;
 
 double interpret(
-    std::vector<int>    const & types, 
-    std::vector<double> const & instances,
-    std::vector<double> const & variables, 
-    auto		      & stack
+    std::vector<int>        const & types, 
+    std::vector<double>     const & instances,
+    std::span<const double> const & variables, 
+    auto		          & stack
 ) {
     size_t sp = 0;
 
@@ -111,27 +113,27 @@ double interpret(
 }
 
 double interpret(
-    polish const & candidate, 
-    auto   const & datapoint,     
-    auto         & stack
+    polish                  const & candidate, 
+    std::span<const double> const & variables, 
+    auto                          & stack
 ) {
     auto const & [types, instances, sizes] = candidate;
-    return interpret(types, instances, datapoint, stack);
+    return interpret(types, instances, variables, stack);
 }
 
 std::vector<double> evaluate(
     std::vector<polish> const & population, 
-    dataset_t           const & dataset
+    dataset             const & data
 ) {
     std::vector<double> results{};
 
-    std::size_t const y_index = std::size(dataset[0]) - 1;
+    std::size_t const y_index = data.cols - 1;
     // can reuse the stack (should be unique per thread)
     std::array<double, max_nodes> stack; 
     for(auto const & candidate : population) {
         // TODO: hopefully don't need a running average here (in case of overflow)
         double ssr = 0;
-        for(auto const & datapoint : dataset) {
+        for(auto const & datapoint : data.rows_view()) {
             double const result = interpret(candidate, datapoint, stack);
             if (!std::isfinite(result)) {
               ssr = std::numeric_limits<double>::infinity();
@@ -140,7 +142,7 @@ std::vector<double> evaluate(
             double const error  = result - datapoint[y_index];
             ssr += error * error;
         }
-        double const mse = ssr / std::size(dataset);
+        double const mse = ssr / data.rows;
         results.push_back(mse);
     }
 

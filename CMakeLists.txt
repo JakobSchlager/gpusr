@@ -13,6 +13,7 @@ option(GPUSR_ENABLE_CUDA "Enable CUDA evaluator" ON)
 # add_executable(gpusr ${headers} ${sources})
 add_executable(gpusr 
     src/dataparser.hpp
+    src/dataset.h
     src/evaluator.h
     src/evolution.hpp
     src/exporter.hpp
@@ -31,7 +32,7 @@ if(GPUSR_ENABLE_CUDA)
     )
 
     set_target_properties(gpusr PROPERTIES
-        CUDA_STANDARD 20
+        CUDA_STANDARD 23
         CUDA_STANDARD_REQUIRED ON
         CUDA_ARCHITECTURES 75
     )

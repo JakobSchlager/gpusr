@@ -3,6 +3,7 @@
 
 #include "./operators.hpp"
 #include "./parameters.h"
+#include "./dataset.h"
 
 #include "./evaluator.h"
 
@@ -165,7 +166,7 @@ __global__ void evaluate_kernel(
 
 std::vector<double> evaluate(
     std::vector<polish> const & population, 
-    dataset_t           const & dataset
+    dataset             const & data
 ) {
     int    *d_population_types, *d_lengths;
     double *d_population_instances, *d_mse, *d_dataset;
@@ -177,9 +178,6 @@ std::vector<double> evaluate(
 
     CUDA_CHECK(cudaMalloc(&d_mse,                  population_size * sizeof(double)));
 
-    std::size_t const row_length = std::size(dataset[0]); // n_variables + y
-    CUDA_CHECK(cudaMalloc(&d_dataset, std::size(dataset) * row_length * sizeof(double)));
-
     for(int i = 0; auto const & [types, instances, sizes] : population) {
     	CUDA_CHECK(cudaMemcpy(d_population_types     + i * max_nodes, types.data(),     std::size(types) * sizeof(int),        cudaMemcpyHostToDevice));
     	CUDA_CHECK(cudaMemcpy(d_population_instances + i * max_nodes, instances.data(), std::size(instances) * sizeof(double), cudaMemcpyHostToDevice));
@@ -187,9 +185,10 @@ std::vector<double> evaluate(
     	++i;
     }
 
-    for(int i = 0; auto const & row : dataset) {
-	cudaMemcpy(d_dataset + i++ * row_length, row.data(), row_length * sizeof(double), cudaMemcpyHostToDevice);
-    }
+    std::size_t const row_length = data.cols; // n_variables + y
+    std::size_t const dataset_bytes = data.rows * row_length * sizeof(double);
+    CUDA_CHECK(cudaMalloc(&d_dataset, dataset_bytes));
+    cudaMemcpy(d_dataset, data.data.data(), dataset_bytes, cudaMemcpyHostToDevice);
 
     // launch one block per candidate, each thread then evaluates |dataset| / BLOCK_SIZE data points
     // should allow to reuse the stacks a bit, while also making reduction easier
@@ -201,7 +200,7 @@ std::vector<double> evaluate(
 	d_lengths,
 	d_dataset,
 	d_mse,
-	std::size(dataset),
+	data.rows,
 	row_length
     );
 

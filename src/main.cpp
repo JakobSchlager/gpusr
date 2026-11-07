@@ -6,6 +6,7 @@
 #include <ranges>
 #include <type_traits>
 #include <vector>
+#include <print>
 
 #include "./operators.hpp"
 #include "./evaluator.h"
@@ -59,8 +60,8 @@ auto measure_time(F&& f, Args&&... args) {
 void run_on(std::string_view filename) {
     exporter exporter{filename}; 
 
-    auto  const     dataset         = read_dataset(std::ifstream {std::filesystem::path("../../data") / filename += ".txt"}); 
-    int   const     no_variables    = std::size(dataset[0]) - 1;
+    auto  const     data         = read_dataset(std::ifstream {std::filesystem::path("../../data") / filename += ".txt"}); 
+    int   const     no_variables = data.cols - 1;
 
     // leaving it as vector for "weighted" sampling and random access
     std::vector<op_code> active_operators { 
@@ -85,7 +86,7 @@ void run_on(std::string_view filename) {
     }
 
     for (int i = 0; i < iterations; ++i) {
-        auto const errors = evaluate(population, dataset);
+        auto const errors = evaluate(population, data);
         next_population.clear();
 
         auto select = get_fitness_proportional_selection(errors);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include "./dataset.h"
 
 using polish = std::tuple<
     std::vector<int>,    // types  
@@ -8,9 +9,7 @@ using polish = std::tuple<
     std::vector<int>     // sizes
 >;
 
-using dataset_t = std::vector<std::vector<double>>;
-
 std::vector<double> evaluate(
     std::vector<polish> const & population, 
-    dataset_t           const & dataset
+    dataset             const & data
 );
