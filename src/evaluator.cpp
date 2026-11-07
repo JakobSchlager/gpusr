@@ -121,19 +121,18 @@ double interpret(
     return interpret(types, instances, variables, stack);
 }
 
-std::vector<double> evaluate(
-    std::vector<polish> const & population, 
-    dataset             const & data
-) {
+cpu_evaluator::cpu_evaluator(dataset const & data) : m_data{data} {};
+
+std::vector<double> cpu_evaluator::evaluate(std::vector<polish> const & population) {
     std::vector<double> results{};
 
-    std::size_t const y_index = data.cols - 1;
+    std::size_t const y_index = m_data.cols - 1;
     // can reuse the stack (should be unique per thread)
     std::array<double, max_nodes> stack; 
     for(auto const & candidate : population) {
         // TODO: hopefully don't need a running average here (in case of overflow)
         double ssr = 0;
-        for(auto const & datapoint : data.rows_view()) {
+        for(auto const & datapoint : m_data.rows_view()) {
             double const result = interpret(candidate, datapoint, stack);
             if (!std::isfinite(result)) {
               ssr = std::numeric_limits<double>::infinity();
@@ -142,7 +141,7 @@ std::vector<double> evaluate(
             double const error  = result - datapoint[y_index];
             ssr += error * error;
         }
-        double const mse = ssr / data.rows;
+        double const mse = ssr / m_data.rows;
         results.push_back(mse);
     }
 

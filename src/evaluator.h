@@ -9,6 +9,16 @@ using polish = std::tuple<
     std::vector<int>     // sizes
 >;
 
+struct cpu_evaluator{
+    dataset const & m_data;
+
+    // TODO(Architecture): Storing a reference to data. 
+    // Could just bind evaluate to data as well.
+    cpu_evaluator(dataset const & data);
+   
+    std::vector<double> evaluate(std::vector<polish> const & population);
+};
+
 struct gpu_evaluator{
     size_t const data_rows, data_cols;
 
@@ -21,7 +31,4 @@ struct gpu_evaluator{
 
     ~gpu_evaluator();
 };
-   
-// TODO(Architecture): CPU side
-std::vector<double> evaluate(std::vector<polish> const & population, dataset const & data);
 
