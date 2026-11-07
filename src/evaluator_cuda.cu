@@ -169,6 +169,11 @@ __global__ void evaluate_kernel(
 gpu_evaluator::gpu_evaluator(dataset const & data) 
       : data_rows{data.rows}, data_cols{data.cols}
     {
+      // contiguous encoding buffers
+      h_types.resize(population_size * max_nodes);
+      h_instances.resize(population_size * max_nodes);
+      h_lengths.resize(population_size);
+
       // dataset
       std::size_t const dataset_bytes = data.rows * data.cols * sizeof(double);
       CUDA_CHECK(cudaMalloc(&d_dataset, dataset_bytes));
@@ -185,11 +190,42 @@ gpu_evaluator::gpu_evaluator(dataset const & data)
 
 std::vector<double> gpu_evaluator::evaluate(std::vector<polish> const & population) {
    for(int i = 0; auto const & [types, instances, sizes] : population) {
-   	CUDA_CHECK(cudaMemcpy(d_population_types     + i * max_nodes, types.data(),     std::size(types) * sizeof(int),        cudaMemcpyHostToDevice));
-   	CUDA_CHECK(cudaMemcpy(d_population_instances + i * max_nodes, instances.data(), std::size(instances) * sizeof(double), cudaMemcpyHostToDevice));
-   	CUDA_CHECK(cudaMemcpy(d_lengths + i, sizes.data(), sizeof(int), cudaMemcpyHostToDevice));
-   	++i;
+        assert(types.size() <= max_nodes);
+        assert(types.size() == instances.size());
+        assert(!sizes.empty());
+
+        std::copy(
+            types.begin(), types.end(),
+            h_types.begin() + i * max_nodes
+        );
+
+        std::copy(
+            instances.begin(), instances.end(),
+            h_instances.begin() + i * max_nodes
+        );
+
+        h_lengths[i] = sizes[0];
+	++i;
    }
+
+   CUDA_CHECK(cudaMemcpy(
+       d_population_types,
+       h_types.data(),
+       h_types.size() * sizeof(int),
+       cudaMemcpyHostToDevice
+   ));
+   CUDA_CHECK(cudaMemcpy(
+       d_population_instances,
+       h_instances.data(),
+       h_instances.size() * sizeof(double),
+       cudaMemcpyHostToDevice
+   ));
+   CUDA_CHECK(cudaMemcpy(
+       d_lengths,
+       h_lengths.data(),
+       h_lengths.size() * sizeof(int),
+       cudaMemcpyHostToDevice
+   ));
 
    // launch one block per candidate, each thread then evaluates |dataset| / BLOCK_SIZE data points
    // should allow to reuse the stacks a bit, while also making reduction easier
