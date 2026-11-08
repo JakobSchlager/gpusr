@@ -16,11 +16,11 @@
 ## Building
 Only nixos with the environment "flake.nix" above was tested.
 
-'''bash
+```bash
 cd gpusr
 nix develop
 ./build.sh [cuda]
-'''
+```
 
 Note that depending on the target (cpu/ cuda) the evaluator has to be adapted in "main.cpp". *Note: Everything is very much a WIP. Currently, two compilation units are created (and compiled with gcc and nvcc respectively). This allows the usage of cpp-26 in the cpu path.*
 
