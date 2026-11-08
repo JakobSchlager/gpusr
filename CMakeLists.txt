@@ -22,6 +22,11 @@ add_executable(gpusr
     src/main.cpp
 )
 
+add_executable(ad
+    src/ad.cpp
+    src/operators.hpp
+)
+
 if(GPUSR_ENABLE_CUDA)
     enable_language(CUDA)
 
